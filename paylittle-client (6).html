@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1D4ED8"><title>PayLittle Client</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:16px system-ui,sans-serif;background:#F1F5F9;color:#0F172A;padding-bottom:90px}
+.hero{min-height:100vh;background:#1D4ED8;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.hero .b{max-width:320px;background:#fff;color:#1D4ED8}
+.hero .b.o{background:transparent;color:#fff;border:2px solid #fff}
+header{background:#1D4ED8;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+header small{color:#BFDBFE}
+.pad{padding:16px}h1{font-size:22px}h2{margin:12px 0}
+input{width:100%;padding:13px;margin:6px 0;border:1px solid #CBD5E1;border-radius:10px;font-size:16px;background:#fff}
+label{font-size:14px;color:#64748B}
+.b{display:block;width:100%;padding:14px;margin:10px 0;border:0;border-radius:12px;background:#1D4ED8;color:#fff;font-size:16px;font-weight:600}
+.b.o{background:#fff;color:#1D4ED8;border:2px solid #1D4ED8}
+.b.s{padding:10px;background:#64748B}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.15);display:grid;gap:6px}
+.card.late{border-left:5px solid #DC2626}
+.row{display:flex;justify-content:space-between;gap:8px}
+.red{color:#DC2626}.ok{color:#16A34A}
+.bar{height:10px;background:#E2E8F0;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:#1D4ED8}
+small{color:#64748B;display:block}
+em{color:#DC2626;font-style:normal;font-size:14px;font-weight:600}
+.mut{color:#64748B;text-align:center;margin-top:40px}
+.l{background:none;border:0;color:inherit;font-size:18px;padding:4px 8px}
+.pad .l{color:#1D4ED8}
+.fab{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);left:16px;right:16px;padding:16px;border:0;border-radius:30px;background:#1D4ED8;color:#fff;font-size:17px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.ads{overflow:hidden;background:#fff;border-bottom:1px solid #E2E8F0}.track{display:flex;width:max-content;gap:12px;padding:10px 6px;animation:slide linear infinite}.ad{width:130px;display:grid;gap:2px;align-content:start}.ad img{width:130px;height:90px;object-fit:cover;border-radius:10px}.ad span{color:#1D4ED8;font-weight:700}@keyframes slide{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.ads{overflow-x:auto}.track{animation:none}}
+</style></head><body>
+<div id="app"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const PAYS=[["🇨🇮","Côte d'Ivoire"],["🇬🇭","Ghana"],["🇲🇱","Mali"],["🇧🇫","Burkina Faso"],["🇳🇪","Niger"],["🇲🇦","Maroc"],["🇸🇳","Sénégal"],["🇲🇷","Mauritanie"]];
+const CFG={apiKey:"AIzaSyCZrn0nwc-CIMyCk2mImEp_-clCDdhLWXU",authDomain:"paylittle-26960.firebaseapp.com",projectId:"paylittle-26960",storageBucket:"paylittle-26960.firebasestorage.app",messagingSenderId:"162181949410",appId:"1:162181949410:web:8ab7718562016d47e7fbbb"};
+let db=null;
+try{db=firebase.firestore()}catch(e){}
+async function hsh(p,c){const s=p+':'+c;try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){let h=5381;for(const ch of s)h=((h<<5)+h+ch.charCodeAt(0))|0;return'x'+h}}
+const store={
+ async recs(cp){const s=await db.collection('clients').where('phone','==',cp).get();return s.docs.map(d=>d.data())},
+ async vendor(vp){const d=await db.collection('vendors').doc(vp).get();return d.exists?d.data():null},
+ async cust(cp){const d=await db.collection('customers').doc(cp).get();return d.exists?d.data():null},
+ async setCust(cp,h){await db.collection('customers').doc(cp).set({phone:cp,hash:h})},
+ async arts(vp){const s=await db.collection('articles').where('vp','==',vp).get();return s.docs.map(d=>d.data())},
+ async setLoc(r,loc){await db.collection('clients').doc(r.vp+'_'+r.phone).update({loc})}
+};
+const $=s=>document.querySelector(s),app=$('#app');
+const fmt=n=>Number(n).toLocaleString('fr-FR')+' F';
+const num=s=>s.replace(/\D/g,'');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const dfr=d=>d.split('-').reverse().join('/');
+const paid=cr=>cr.acompte+cr.versements.reduce((s,v)=>s+v.montant,0);
+const LIB={j:'jour',s:'semaine',m:'mois'},STEP={j:1,s:7,m:30};
+const addDays=(d,n)=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
+const nextDue=cr=>{if(!cr.plan)return cr.echeance;const k=Math.min(Math.floor((paid(cr)-cr.acompte)/cr.plan.montant)+1,cr.plan.n);return addDays(cr.date,k*STEP[cr.plan.freq])};
+const late=cr=>cr.prix-paid(cr)>0&&nextDue(cr)&&nextDue(cr)<today();
+const dueNow=cr=>{if(!cr.plan)return cr.echeance&&cr.echeance<today()?Math.max(0,cr.prix-paid(cr)):0;const d=Math.floor((Date.parse(today())-Date.parse(cr.date))/864e5),k=Math.min(Math.max(Math.floor(d/STEP[cr.plan.freq]),0),cr.plan.n);return Math.max(0,Math.min(cr.prix,cr.acompte+k*cr.plan.montant)-paid(cr))};
+const owed=c=>c.credits.reduce((s,x)=>s+x.prix-paid(x),0);
+let S={sel:null,client:null};
+const nn=ph=>ph.length==10?'225'+ph:ph;
+const echu=c=>c.credits.reduce((s,x)=>s+dueNow(x),0);
+const okCode=c=>/^\d{4,6}$/.test(c);
+const sched=cr=>{const L=[],p=cr.plan,base=cr.prix-cr.acompte;if(!p||base<=0)return L;let cum=0;for(let k=1;k<=p.n&&cum<base;k++){const m=Math.min(p.montant,base-cum);cum+=m;L.push({k,date:addDays(cr.date,k*STEP[p.freq]),montant:m,cum})}return L};
+const schedHtml=(cr,i,v)=>{const L=sched(cr);if(!L.length)return'';const pd=paid(cr)-cr.acompte;let nxt=true;return `<details open><summary>Échéancier (${L.length} versements)</summary>${L.map(e=>{const ok=pd>=e.cum,isNext=!ok&&nxt;if(!ok)nxt=false;const lt=!ok&&e.date<today();return `<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid #E2E8F0"><span>${v?`<input type="checkbox" style="width:auto;margin:0 8px 0 0" ${ok?'checked disabled':isNext?'':'disabled'} onchange="tick(${i},${e.k})">`:(ok?'✅ ':'⏳ ')}${dfr(e.date)}</span><b class="${ok?'ok':lt?'red':''}">${fmt(e.montant)}${ok?' payé':lt?' en retard':''}</b></div>`}).join('')}</details>`};
+
+
+function logo(s){return `<svg width="${s}" height="${s}" viewBox="0 0 160 160" role="img" aria-label="PayLittle"><rect width="160" height="160" rx="36" fill="#fff"/><path d="M0 116h160v8a36 36 0 0 1-36 36H36a36 36 0 0 1-36-36z" fill="#1D4ED8"/><circle cx="80" cy="58" r="38" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="6"/><path d="M80 58V20a38 38 0 0 1 38 38z" fill="#1D4ED8"/><path d="M80 58h38a38 38 0 0 1-38 38z" fill="#60A5FA"/><text x="80" y="147" text-anchor="middle" font-size="19" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">PayLittle</text></svg>`}
+
+function login(){S.client=null;S.R=null;S.locDone=0;app.innerHTML=`<div class="hero">${logo(110)}<p>Espace client</p><input id="ph" type="tel" placeholder="Votre numéro de téléphone" style="max-width:320px"><input id="cd" type="password" inputmode="numeric" placeholder="Votre code secret" style="max-width:320px"><button class="b" onclick="clientGo()">Voir mes crédits</button><small style="color:#BFDBFE;max-width:320px">Première connexion ? Entrez seulement votre numéro : vous créerez ensuite votre propre code secret.</small><small style="color:#BFDBFE;max-width:320px">Crédit ouvert aux clients de :<br>${PAYS.map(p=>p[0]+' '+p[1]).join(' · ')}</small></div>`}
+async function enter(ph){const R=await store.recs(ph);await Promise.all(R.map(async r=>{r.v=(await store.vendor(r.vp))||{nom:'Votre vendeur',pay:'',payFmt:''}}));S.R=R;S.client={nom:R[0].nom,phone:ph};clientView()}
+async function clientGo(){const ph=num($('#ph').value),cd=$('#cd').value.trim();if(ph.length<8)return alert('Entrez votre numéro de téléphone.');
+try{const R=await store.recs(ph);if(!R.length)return alert('Aucun crédit trouvé pour ce numéro. Demandez à votre vendeur de vous enregistrer.');
+const cu=await store.cust(ph);if(!cu)return newCode(ph);
+if(cu.hash!==await hsh(ph,cd))return alert('Numéro ou code incorrect.');await enter(ph)}catch(e){alert('Connexion impossible. Vérifiez internet et réessayez.')}}
+function newCode(ph){app.innerHTML=`<div class="hero">${logo(100)}<p>Créez votre code secret</p><small style="color:#BFDBFE;max-width:320px">Ce code est à vous seul. Ne le donnez à personne, pas même au vendeur.</small><input id="n1" type="password" inputmode="numeric" placeholder="Choisissez un code (4 à 6 chiffres)" style="max-width:320px"><input id="n2" type="password" inputmode="numeric" placeholder="Retapez votre code" style="max-width:320px"><input id="ap" type="number" inputmode="numeric" placeholder="Montant de votre premier versement (F)" style="max-width:320px"><small style="color:#BFDBFE;max-width:320px">Ce montant, que vous avez donné au vendeur, sert à vérifier que c'est bien vous.</small><button class="b" onclick="setCode('${ph}')">Créer mon code</button><button class="b o" onclick="login()">Retour</button></div>`}
+async function setCode(ph){const a=$('#n1').value.trim();if(!okCode(a))return alert('Le code doit avoir 4 à 6 chiffres.');if(a!==$('#n2').value.trim())return alert('Les deux codes ne sont pas identiques.');
+try{const R=await store.recs(ph),m=+$('#ap').value;if(!R.some(r=>r.credits.some(x=>x.acompte===m)))return alert('Ce montant ne correspond pas. Vérifiez votre premier versement.');
+if(await store.cust(ph))return alert('Un code existe déjà. Connectez-vous.');await store.setCust(ph,await hsh(ph,a));await enter(ph)}catch(e){alert('Échec. Vérifiez internet et réessayez.')}}
+
+function cardCr(cr,i,v){const p=paid(cr),l=cr.prix-p,pc=Math.min(100,Math.round(p/cr.prix*100));
+return `<div class="card ${late(cr)?'late':''}"><div class="row"><b>${esc(cr.article)}</b><b>${fmt(cr.prix)}</b></div>${cr.interet?`<small>Article ${fmt(cr.base)} + intérêts ${fmt(cr.interet)}</small>`:''}${cr.cat?`<small>${esc(cr.cat)}</small>`:''}<div class="bar"><i style="width:${pc}%"></i></div><div class="row"><span>Payé ${fmt(p)}</span><b class="${l>0?'red':'ok'}">${l>0?'Reste '+fmt(l):'Soldé'}</b></div>${l>0&&cr.plan?`<small>À payer : ${fmt(cr.plan.montant)} par ${LIB[cr.plan.freq]}. Prochain versement avant le ${dfr(nextDue(cr))}.</small>`:''}${cr.echeance&&l>0?`<small>Date limite : ${dfr(cr.echeance)}</small>`:''}${dueNow(cr)>0&&l>0?`<em>${late(cr)?'En retard : ':'À payer maintenant : '}${fmt(dueNow(cr))}</em>`:''}${schedHtml(cr,i,v)}<details><summary>Historique (${cr.versements.length+1})</summary><small>${dfr(cr.date)} : acompte ${fmt(cr.acompte)}</small>${cr.versements.map(x=>`<small>${dfr(x.date)} : ${fmt(x.montant)}</small>`).join('')}</details>${v&&l>0?`<button class="b s" onclick="pay(${i})">Ajouter un versement</button>`:''}</div>`}
+
+async function clientView(){const c=S.client,R=S.R,A=(await Promise.all(R.map(r=>store.arts(r.vp)))).flat(),O=R.reduce((s,r)=>s+owed(r),0);const ad=A.length?`<div class="ads"><div class="track" style="animation-duration:${Math.max(12,A.length*5)}s">${[...A,...A].map(a=>`<div class="ad">${a.img?`<img src="${a.img}" alt="">`:''}<b>${esc(a.nom)}</b><small>${esc(a.cat)}</small><span>${fmt(a.prix)}</span></div>`).join('')}</div></div>`:'';
+const pay=R.map((r,k)=>owed(r)>0&&r.v.pay?`<div class="card"><b>Comment payer${R.length>1?' : '+esc(r.v.nom):''}</b><small>Envoyez votre versement par Wave ou Orange Money au :</small><h1>${esc(r.v.payFmt)}</h1><div class="row"><button class="b s" onclick="copyNum(${k})">Copier le numéro</button><button class="b s" onclick="sendProof(${k})">J'ai payé (WhatsApp)</button></div><small>Votre vendeur valide votre paiement dès réception.</small></div>`:'').join('');
+const E=R.reduce((s,r)=>s+echu(r),0),D=R.map((r,k)=>[k,echu(r)]).filter(x=>x[1]>0),ban=E>0?`<div style="position:sticky;top:0;z-index:5;background:#DC2626;color:#fff;padding:12px 16px;font-weight:600">Un versement de ${fmt(E)} est arrivé à échéance.</div>`:'',btn=D.length==1?`<button class="fab" style="background:#DC2626" onclick="payNow(${D[0][0]},${D[0][1]})">Payer ${fmt(D[0][1])} maintenant</button>`:'';
+const cr=R.map(r=>(R.length>1?`<h2>${esc(r.v.nom)}</h2>`:'')+r.credits.map((x,i)=>cardCr(x,i,false)).join('')).join('');
+app.innerHTML=`<header><div><small>Bonjour</small><h1>${esc(c.nom)}</h1></div><div style="text-align:right"><small>Reste à payer</small><h1>${fmt(O)}</h1></div></header>${ban}${ad}<div class="pad">${pay}${cr}<button class="b o" onclick="login()">Quitter</button></div>${btn}`;if(!S.locDone){S.locDone=1;sendLoc()}}
+
+function payNow(k,m){copyNum(k,true);if(confirm('Envoyez '+fmt(m)+' par Wave ou Orange Money au '+S.R[k].v.payFmt+' (numéro copié).\n\nVous avez déjà payé ? Appuyez sur OK pour prévenir le vendeur sur WhatsApp.'))sendProof(k)}
+function copyNum(k,q){const n=S.R[k].v.pay;if(navigator.clipboard)navigator.clipboard.writeText(n).then(()=>{if(!q)alert('Numéro copié : '+n)},()=>{});else if(!q)prompt('Numéro',n)}
+function sendLoc(){if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(async p=>{try{const loc={lat:p.coords.latitude,lng:p.coords.longitude,prec:Math.round(p.coords.accuracy),date:new Date().toISOString()};await Promise.all(S.R.map(r=>store.setLoc(r,loc)))}catch(e){}},()=>{},{enableHighAccuracy:true,timeout:20000,maximumAge:60000})}
+function sendProof(k){const r=S.R[k];open('https://wa.me/'+nn(r.v.pay)+'?text='+encodeURIComponent(`Bonjour, c'est ${S.client.nom}. J'ai envoyé mon versement par Wave/Orange Money. Merci de le valider. PayLittle`))}
+
+login();
+</script></body></html>
