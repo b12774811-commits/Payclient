@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1D4ED8"><title>PayLittle Client</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:16px system-ui,sans-serif;background:#F1F5F9;color:#0F172A;padding-bottom:90px}
+.hero{min-height:100vh;background:#1D4ED8;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.hero .b{max-width:320px;background:#fff;color:#1D4ED8}
+.hero .b.o{background:transparent;color:#fff;border:2px solid #fff}
+header{background:#1D4ED8;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+header small{color:#BFDBFE}
+.pad{padding:16px}h1{font-size:22px}h2{margin:12px 0}
+input{width:100%;padding:13px;margin:6px 0;border:1px solid #CBD5E1;border-radius:10px;font-size:16px;background:#fff}
+label{font-size:14px;color:#64748B}
+.b{display:block;width:100%;padding:14px;margin:10px 0;border:0;border-radius:12px;background:#1D4ED8;color:#fff;font-size:16px;font-weight:600}
+.b.o{background:#fff;color:#1D4ED8;border:2px solid #1D4ED8}
+.b.s{padding:10px;background:#64748B}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.15);display:grid;gap:6px}
+.card.late{border-left:5px solid #DC2626}
+.row{display:flex;justify-content:space-between;gap:8px}
+.red{color:#DC2626}.ok{color:#16A34A}
+.bar{height:10px;background:#E2E8F0;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:#1D4ED8}
+small{color:#64748B;display:block}
+em{color:#DC2626;font-style:normal;font-size:14px;font-weight:600}
+.mut{color:#64748B;text-align:center;margin-top:40px}
+.l{background:none;border:0;color:inherit;font-size:18px;padding:4px 8px}
+.pad .l{color:#1D4ED8}
+.fab{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);left:16px;right:16px;padding:16px;border:0;border-radius:30px;background:#1D4ED8;color:#fff;font-size:17px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.ads{overflow:hidden;background:#fff;border-bottom:1px solid #E2E8F0}.track{display:flex;width:max-content;gap:12px;padding:10px 6px;animation:slide linear infinite}.ad{width:130px;display:grid;gap:2px;align-content:start}.ad img{width:130px;height:90px;object-fit:cover;border-radius:10px}.ad span{color:#1D4ED8;font-weight:700}@keyframes slide{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.ads{overflow-x:auto}.track{animation:none}}
+</style></head><body>
+<div id="app"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const CFG=null;
+let db=null;
+try{if(CFG){firebase.initializeApp(CFG);db=firebase.firestore();}}catch(e){}
+const store={
+ async arts(){if(db){const s=await db.collection('articles').get();return s.docs.map(d=>d.data());}return JSON.parse(localStorage.getItem('pla')||'[]');},
+ async all(){if(db){const s=await db.collection('clients').get();return s.docs.map(d=>d.data());}return JSON.parse(localStorage.getItem('pl')||'[]');},
+ async get(p){if(db){const d=await db.collection('clients').doc(p).get();return d.exists?d.data():null;}return(await this.all()).find(c=>c.phone===p)||null;},
+ async save(c){if(db){await db.collection('clients').doc(c.phone).set(c);return;}const a=await this.all();const i=a.findIndex(x=>x.phone===c.phone);i<0?a.push(c):a[i]=c;localStorage.setItem('pl',JSON.stringify(a));}
+};
+const $=s=>document.querySelector(s),app=$('#app');
+const fmt=n=>Number(n).toLocaleString('fr-FR')+' F';
+const num=s=>s.replace(/\D/g,'');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const dfr=d=>d.split('-').reverse().join('/');
+const paid=cr=>cr.acompte+cr.versements.reduce((s,v)=>s+v.montant,0);
+const late=cr=>cr.prix-paid(cr)>0&&cr.echeance&&cr.echeance<today();
+const owed=c=>c.credits.reduce((s,x)=>s+x.prix-paid(x),0);
+let S={sel:null,client:null};
+
+function logo(s){return `<svg width="${s}" height="${s}" viewBox="0 0 160 160" role="img" aria-label="PayLittle"><rect width="160" height="160" rx="36" fill="#fff"/><path d="M0 116h160v8a36 36 0 0 1-36 36H36a36 36 0 0 1-36-36z" fill="#1D4ED8"/><circle cx="80" cy="58" r="38" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="6"/><path d="M80 58V20a38 38 0 0 1 38 38z" fill="#1D4ED8"/><path d="M80 58h38a38 38 0 0 1-38 38z" fill="#60A5FA"/><text x="80" y="147" text-anchor="middle" font-size="19" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">PayLittle</text></svg>`}
+
+function login(){S.client=null;app.innerHTML=`<div class="hero">${logo(110)}<p>Espace client</p><input id="ph" type="tel" placeholder="Votre numéro de téléphone" style="max-width:320px"><input id="cd" type="tel" placeholder="Votre code à 4 chiffres" style="max-width:320px"><button class="b" onclick="clientGo()">Voir mes crédits</button></div>`}
+async function clientGo(){const c=await store.get(num($('#ph').value));if(!c||c.code!==$('#cd').value.trim())return alert('Numéro ou code incorrect');S.client=c;clientView()}
+
+function cardCr(cr,i,v){const p=paid(cr),l=cr.prix-p,pc=Math.min(100,Math.round(p/cr.prix*100));
+return `<div class="card ${late(cr)?'late':''}"><div class="row"><b>${esc(cr.article)}</b><b>${fmt(cr.prix)}</b></div>${cr.cat?`<small>${esc(cr.cat)}</small>`:''}<div class="bar"><i style="width:${pc}%"></i></div><div class="row"><span>Payé ${fmt(p)}</span><b class="${l>0?'red':'ok'}">${l>0?'Reste '+fmt(l):'Soldé'}</b></div>${cr.echeance&&l>0?`<small>Date limite : ${dfr(cr.echeance)}</small>`:''}${late(cr)?'<em>En retard</em>':''}<details><summary>Historique (${cr.versements.length+1})</summary><small>${dfr(cr.date)} : acompte ${fmt(cr.acompte)}</small>${cr.versements.map(x=>`<small>${dfr(x.date)} : ${fmt(x.montant)}</small>`).join('')}</details>${v&&l>0?`<button class="b s" onclick="pay(${i})">Ajouter un versement</button>`:''}</div>`}
+
+async function clientView(){const c=S.client,A=await store.arts();const ad=A.length?`<div class="ads"><div class="track" style="animation-duration:${Math.max(12,A.length*5)}s">${[...A,...A].map(a=>`<div class="ad">${a.img?`<img src="${a.img}" alt="">`:''}<b>${esc(a.nom)}</b><small>${esc(a.cat)}</small><span>${fmt(a.prix)}</span></div>`).join('')}</div></div>`:'';app.innerHTML=`<header><div><small>Bonjour</small><h1>${esc(c.nom)}</h1></div><div style="text-align:right"><small>Reste à payer</small><h1>${fmt(owed(c))}</h1></div></header>${ad}<div class="pad">${c.credits.map((x,i)=>cardCr(x,i,false)).join('')}<button class="b o" onclick="login()">Quitter</button></div>`}
+
+
+login();
+</script></body></html>
