@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1D4ED8"><link rel="manifest" href="manifest-client.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><title>PayLittle Client</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:16px system-ui,sans-serif;background:#F1F5F9;color:#0F172A;padding-bottom:90px}
+.hero{min-height:100vh;background:#1D4ED8;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.hero .b{max-width:320px;background:#fff;color:#1D4ED8}
+.hero .b.o{background:transparent;color:#fff;border:2px solid #fff}
+header{background:#1D4ED8;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+header small{color:#BFDBFE}
+.pad{padding:16px}h1{font-size:22px}h2{margin:12px 0}
+input{width:100%;padding:13px;margin:6px 0;border:1px solid #CBD5E1;border-radius:10px;font-size:16px;background:#fff}
+label{font-size:14px;color:#64748B}
+.b{display:block;width:100%;padding:14px;margin:10px 0;border:0;border-radius:12px;background:#1D4ED8;color:#fff;font-size:16px;font-weight:600}
+.b:disabled{opacity:.6}
+.b.o{background:#fff;color:#1D4ED8;border:2px solid #1D4ED8}
+.b.s{padding:10px;background:#64748B}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.15);display:grid;gap:6px}
+.card.late{border-left:5px solid #DC2626}
+.row{display:flex;justify-content:space-between;gap:8px}
+.red{color:#DC2626}.ok{color:#16A34A}
+.bar{height:10px;background:#E2E8F0;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:#1D4ED8}
+small{color:#64748B;display:block}
+em{color:#DC2626;font-style:normal;font-size:14px;font-weight:600}
+.mut{color:#64748B;text-align:center;margin-top:40px}
+.l{background:none;border:0;color:inherit;font-size:18px;padding:4px 8px}
+.pad .l{color:#1D4ED8}
+.fab{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);left:16px;right:16px;padding:16px;border:0;border-radius:30px;background:#1D4ED8;color:#fff;font-size:17px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.ads{overflow:hidden;background:#fff;border-bottom:1px solid #E2E8F0}.track{display:flex;width:max-content;gap:12px;padding:10px 6px;animation:slide linear infinite}.ad{width:130px;display:grid;gap:2px;align-content:start}.ad img{width:130px;height:90px;object-fit:cover;border-radius:10px}.ad span{color:#1D4ED8;font-weight:700}@keyframes slide{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.ads{overflow-x:auto}.track{animation:none}}
+</style></head><body>
+<div id="app"></div>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+const PAYS=[["🇨🇮","Côte d'Ivoire"],["🇬🇭","Ghana"],["🇲🇱","Mali"],["🇧🇫","Burkina Faso"],["🇳🇪","Niger"],["🇲🇦","Maroc"],["🇸🇳","Sénégal"],["🇲🇷","Mauritanie"]];
+const CFG={apiKey:"AIzaSyCZrn0nwc-CIMyCk2mImEp_-clCDdhLWXU",authDomain:"paylittle-26960.firebaseapp.com",projectId:"paylittle-26960",storageBucket:"paylittle-26960.firebasestorage.app",messagingSenderId:"162181949410",appId:"1:162181949410:web:8ab7718562016d47e7fbbb"};
+firebase.initializeApp(CFG);
+const db=firebase.firestore(),auth=firebase.auth();
+const CM=(ph,n)=>'c'+n+'.'+ph+'@paylittle.app',PW=c=>'PL'+c;
+function authErr(e){const k=(e&&e.code)||'';if(k=='auth/too-many-requests')return'Trop d\'essais. Réessayez dans quelques minutes.';if(k=='auth/network-request-failed')return'Pas de connexion internet.';if(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-login-credentials'].includes(k))return'Numéro ou code incorrect.';if(k=='permission-denied')return'Accès refusé. Demandez à votre vendeur de vérifier votre compte.';return'Connexion impossible. Vérifiez internet et réessayez.'}
+const store={
+ async recs(cp){const s=await db.collection('clients').where('phone','==',cp).get();return s.docs.map(d=>d.data())},
+ async vendor(vp){const d=await db.collection('vendors').doc(vp).get();return d.exists?d.data():null},
+ async cust(cp){const d=await db.collection('customers').doc(cp).get();return d.exists?d.data():null},
+ async doneTmp(cp){await db.collection('customers').doc(cp).update({tmp:false})},
+ async arts(vp){const s=await db.collection('articles').where('vp','==',vp).get();return s.docs.map(d=>d.data())},
+ async setLoc(r,loc){await db.collection('clients').doc(r.vp+'_'+r.phone).update({loc})}
+};
+const $=s=>document.querySelector(s),app=$('#app');
+const fmt=n=>Number(n).toLocaleString('fr-FR')+' F';
+const num=s=>String(s||'').replace(/\D/g,'');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const im=u=>/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(u||'')?u:'';
+const today=()=>new Date().toISOString().slice(0,10);
+const dfr=d=>d.split('-').reverse().join('/');
+const paid=cr=>cr.acompte+cr.versements.reduce((s,v)=>s+v.montant,0);
+const LIB={j:'jour',s:'semaine',m:'mois'},STEP={j:1,s:7,m:30};
+const addDays=(d,n)=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
+const nextDue=cr=>{if(!cr.plan)return cr.echeance;const k=Math.min(Math.floor((paid(cr)-cr.acompte)/cr.plan.montant)+1,cr.plan.n);return addDays(cr.date,k*STEP[cr.plan.freq])};
+const late=cr=>cr.prix-paid(cr)>0&&nextDue(cr)&&nextDue(cr)<today();
+const dueNow=cr=>{if(!cr.plan)return cr.echeance&&cr.echeance<today()?Math.max(0,cr.prix-paid(cr)):0;const d=Math.floor((Date.parse(today())-Date.parse(cr.date))/864e5),k=Math.min(Math.max(Math.floor(d/STEP[cr.plan.freq]),0),cr.plan.n);return Math.max(0,Math.min(cr.prix,cr.acompte+k*cr.plan.montant)-paid(cr))};
+const owed=c=>c.credits.reduce((s,x)=>s+x.prix-paid(x),0);
+let S={sel:null,client:null,R:null,locDone:0},BUSY=false;
+const nn=ph=>ph.length==10?'225'+ph:ph;
+const echu=c=>c.credits.reduce((s,x)=>s+dueNow(x),0);
+const soon=c=>c.credits.reduce((s,x)=>{const l=x.prix-paid(x);if(l<=0||dueNow(x)>0)return s;return nextDue(x)==addDays(today(),1)?s+(x.plan?Math.min(x.plan.montant,l):l):s},0);
+const okCode=c=>/^\d{6,10}$/.test(c);
+const sched=cr=>{const L=[],p=cr.plan,base=cr.prix-cr.acompte;if(!p||base<=0)return L;let cum=0;for(let k=1;k<=p.n&&cum<base;k++){const m=Math.min(p.montant,base-cum);cum+=m;L.push({k,date:addDays(cr.date,k*STEP[p.freq]),montant:m,cum})}return L};
+const schedHtml=cr=>{const L=sched(cr);if(!L.length)return'';const pd=paid(cr)-cr.acompte;return `<details open><summary>Échéancier (${L.length} versements)</summary>${L.map(e=>{const ok=pd>=e.cum,lt=!ok&&e.date<today();return `<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid #E2E8F0"><span>${ok?'✅ ':'⏳ '}${dfr(e.date)}</span><b class="${ok?'ok':lt?'red':''}">${fmt(e.montant)}${ok?' payé':lt?' en retard':''}</b></div>`}).join('')}</details>`};
+
+function logo(s){return `<svg width="${s}" height="${s}" viewBox="0 0 160 160" role="img" aria-label="PayLittle"><rect width="160" height="160" rx="36" fill="#fff"/><path d="M0 116h160v8a36 36 0 0 1-36 36H36a36 36 0 0 1-36-36z" fill="#1D4ED8"/><circle cx="80" cy="58" r="38" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="6"/><path d="M80 58V20a38 38 0 0 1 38 38z" fill="#1D4ED8"/><path d="M80 58h38a38 38 0 0 1-38 38z" fill="#60A5FA"/><text x="80" y="147" text-anchor="middle" font-size="19" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">PayLittle</text></svg>`}
+
+function login(){S.client=null;S.R=null;S.locDone=0;S.said=0;clearInterval(S.tm);S.hello='';try{window.speechSynthesis&&speechSynthesis.cancel()}catch(e){}auth.signOut().catch(()=>{});app.innerHTML=`<div class="hero">${logo(110)}<p>Espace client</p><input id="ph" type="tel" placeholder="Votre numéro de téléphone" style="max-width:320px"><input id="cd" type="password" inputmode="numeric" placeholder="Votre code secret" style="max-width:320px"><button class="b" id="go" onclick="clientGo()">Voir mes crédits</button><button class="b o" id="inst" style="${window.DI?'':'display:none;'}max-width:320px" onclick="install()">Installer l'application</button><small style="color:#BFDBFE;max-width:320px">Android : menu ⋮ du navigateur, puis « Installer l'application ». iPhone : bouton Partager, puis « Sur l'écran d'accueil ».</small><small style="color:#BFDBFE;max-width:320px">Première connexion ? Entrez votre numéro et le code provisoire donné par votre vendeur : vous créerez ensuite votre propre code secret.</small><small style="color:#BFDBFE;max-width:320px">Crédit ouvert aux clients de :<br>${PAYS.map(p=>p[0]+' '+p[1]).join(' · ')}</small></div>`}
+async function enter(ph){const R=await store.recs(ph);if(!R.length){await auth.signOut();return alert('Aucun crédit trouvé pour ce numéro.')}
+await Promise.all(R.map(async r=>{try{r.v=(await store.vendor(r.vp))||{nom:'Votre vendeur',pay:'',payFmt:''}}catch(e){r.v={nom:'Votre vendeur',pay:'',payFmt:''}}}));S.R=R;S.client={nom:R[0].nom,phone:ph};clientView()}
+async function clientGo(){if(BUSY)return;if(locked())return alert('Trop d\'essais incorrects. Réessayez dans 15 minutes.');const ph=num($('#ph').value),cd=$('#cd').value.trim();if(ph.length<8)return alert('Entrez votre numéro de téléphone.');if(!cd)return alert('Entrez votre code. Première connexion : demandez un code provisoire à votre vendeur.');
+BUSY=true;try{const cu=await store.cust(ph);if(!cu||!cu.uid)return alert('Aucun compte client pour ce numéro. Demandez à votre vendeur de vous enregistrer ou de générer un code provisoire.');
+await auth.signInWithEmailAndPassword(CM(ph,cu.n),PW(cd));okTry();
+if(cu.tmp){if(cu.at&&Date.now()-cu.at>6048e5){await auth.signOut();return alert('Ce code provisoire a expiré (plus de 7 jours). Demandez un nouveau code à votre vendeur.')}return newCode(ph)}
+await enter(ph)}catch(e){badTry(e);alert(authErr(e))}finally{BUSY=false}}
+function newCode(ph){app.innerHTML=`<div class="hero">${logo(100)}<p>Créez votre code secret</p><small style="color:#BFDBFE;max-width:320px">Ce code est à vous seul. Ne le donnez à personne, pas même au vendeur.</small><input id="n1" type="password" inputmode="numeric" placeholder="Choisissez un code (6 à 10 chiffres)" style="max-width:320px"><input id="n2" type="password" inputmode="numeric" placeholder="Retapez votre code" style="max-width:320px"><button class="b" onclick="setCode('${esc(ph)}')">Créer mon code</button><button class="b o" onclick="login()">Retour</button></div>`}
+async function setCode(ph){if(BUSY)return;const a=$('#n1').value.trim();if(!okCode(a))return alert('Le code doit avoir 6 à 10 chiffres.');if(a!==$('#n2').value.trim())return alert('Les deux codes ne sont pas identiques.');
+BUSY=true;try{await auth.currentUser.updatePassword(PW(a));await store.doneTmp(ph);await enter(ph)}catch(e){alert(authErr(e))}finally{BUSY=false}}
+
+
+const hist=(cr,call)=>[{date:cr.date,montant:cr.acompte,lib:'acompte'},...cr.versements.map(x=>({date:x.date,montant:x.montant,lib:'versement'}))].map((x,k)=>`<div class="row" style="align-items:center"><small>${dfr(x.date)} : ${x.lib} ${fmt(x.montant)}</small><button class="l" onclick="${call(k)}">Reçu</button></div>`).join('');
+function recu(nom,vnom,vpay,cr,k){
+ const it=[{date:cr.date,montant:cr.acompte,lib:'Acompte'},...cr.versements.map(x=>({date:x.date,montant:x.montant,lib:'Versement'}))],x=it[k],cum=it.slice(0,k+1).reduce((s,y)=>s+y.montant,0),reste=Math.max(0,cr.prix-cum),no='PL-'+x.date.replace(/-/g,'')+'-'+(k+1);
+ const T='REÇU DE PAIEMENT - PayLittle\nN° '+no+'\nDate : '+dfr(x.date)+'\nClient : '+nom+'\nVendeur : '+vnom+'\nArticle : '+cr.article+'\n'+x.lib+' reçu : '+fmt(x.montant)+'\nTotal payé : '+fmt(cum)+' sur '+fmt(cr.prix)+'\nReste à payer : '+fmt(reste);
+ const d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px';
+ d.innerHTML='<div class="card" style="width:100%;max-width:380px;margin:0"><h1 style="color:#1D4ED8">Reçu de paiement</h1><small>N° '+esc(no)+'</small><div class="row"><span>Date</span><b>'+dfr(x.date)+'</b></div><div class="row"><span>Client</span><b>'+esc(nom)+'</b></div><div class="row"><span>Vendeur</span><b>'+esc(vnom)+'</b></div><div class="row"><span>Article</span><b>'+esc(cr.article)+'</b></div><div class="row"><span>'+x.lib+' reçu</span><b class="ok">'+fmt(x.montant)+'</b></div><div class="row"><span>Total payé</span><b>'+fmt(cum)+' / '+fmt(cr.prix)+'</b></div><div class="row"><span>Reste à payer</span><b class="'+(reste>0?'red':'ok')+'">'+(reste>0?fmt(reste):'Soldé')+'</b></div><button class="b" id="rw">Partager sur WhatsApp</button><button class="b o" id="rd">Télécharger (image)</button><button class="b o" id="rc">Fermer</button></div>';
+ document.body.appendChild(d);d.querySelector('#rc').onclick=()=>d.remove();d.querySelector('#rd').onclick=()=>dlRecu(T,no);d.querySelector('#rw').onclick=()=>open('https://wa.me/?text='+encodeURIComponent(T));
+}
+function recuC(ri,ci,k){const r=S.R[ri];recu(S.client.nom,r.v.nom,r.v.payFmt,r.credits[ci],k)}
+function cardCr(cr,ri,ci){const p=paid(cr),l=cr.prix-p,pc=Math.min(100,Math.round(p/cr.prix*100));
+return `<div class="card ${late(cr)?'late':''}"><div class="row"><b>${esc(cr.article)}</b><b>${fmt(cr.prix)}</b></div>${cr.interet?`<small>Article ${fmt(cr.base)} + intérêts ${fmt(cr.interet)}</small>`:''}${cr.cat?`<small>${esc(cr.cat)}</small>`:''}<div class="bar"><i style="width:${pc}%"></i></div><div class="row"><span>Payé ${fmt(p)}</span><b class="${l>0?'red':'ok'}">${l>0?'Reste '+fmt(l):'Soldé'}</b></div>${l>0&&cr.plan?`<small>À payer : ${fmt(cr.plan.montant)} par ${LIB[cr.plan.freq]}. Prochain versement avant le ${dfr(nextDue(cr))}.</small>`:''}${cr.echeance&&l>0?`<small>Date limite : ${dfr(cr.echeance)}</small>`:''}${dueNow(cr)>0&&l>0?`<em>${late(cr)?'En retard : ':'À payer maintenant : '}${fmt(dueNow(cr))}</em>`:''}${schedHtml(cr)}<details><summary>Historique (${cr.versements.length+1})</summary>${hist(cr,k=>'recuC('+ri+','+ci+','+k+')')}</details></div>`}
+
+async function clientView(){const c=S.client,R=S.R;let A=[];try{A=(await Promise.all(R.map(r=>store.arts(r.vp)))).flat()}catch(e){}const O=R.reduce((s,r)=>s+owed(r),0);const ad=A.length?`<div class="ads"><div class="track" style="animation-duration:${Math.max(12,A.length*5)}s">${[...A,...A].map(a=>`<div class="ad">${im(a.img)?`<img src="${im(a.img)}" alt="">`:''}<b>${esc(a.nom)}</b><small>${esc(a.cat)}</small><span>${fmt(a.prix)}</span></div>`).join('')}</div></div>`:'';
+const pay=R.map((r,k)=>owed(r)>0&&r.v.pay?`<div class="card"><b>Comment payer${R.length>1?' : '+esc(r.v.nom):''}</b><small>Envoyez votre versement par Wave ou Orange Money au :</small><h1>${esc(r.v.payFmt)}</h1><div class="row"><button class="b s" onclick="copyNum(${k})">Copier le numéro</button><button class="b s" onclick="sendProof(${k})">J'ai payé (WhatsApp)</button></div><small>Votre vendeur valide votre paiement dès réception.</small></div>`:'').join('');
+const E=R.reduce((s,r)=>s+echu(r),0),D=R.map((r,k)=>[k,echu(r)]).filter(x=>x[1]>0),ban=E>0?`<div style="position:sticky;top:0;z-index:5;background:#DC2626;color:#fff;padding:12px 16px;font-weight:600">Un versement de ${fmt(E)} est arrivé à échéance.</div>`:'',btn=D.length==1&&R[D[0][0]].v.pay?`<button class="fab" style="background:#DC2626" onclick="payNow(${D[0][0]},${D[0][1]})">Payer ${fmt(D[0][1])} maintenant</button>`:'';
+const cr=R.map((r,ri)=>(R.length>1?`<h2>${esc(r.v.nom)}</h2>`:'')+r.credits.map((x,ci)=>cardCr(x,ri,ci)).join('')).join('');
+const SO=R.reduce((s,r)=>s+soon(r),0),civ=(R[0].info&&R[0].info.sexe=='Femme')?'Madame':'Monsieur';
+S.msg=E>0?`Bonjour ${civ} ${c.nom}. Votre paiement de ${E} francs est en retard. Veuillez vous en acquitter, s'il vous plaît. Merci.`:SO>0?`Bonjour ${civ} ${c.nom}. Un versement de ${SO} francs est à payer demain. Merci de prévoir votre paiement.`:'';
+const ban2=E==0&&SO>0?`<div style="background:#F59E0B;color:#fff;padding:12px 16px;font-weight:600">Rappel : un versement de ${fmt(SO)} est à payer demain.</div>`:'';
+if(!S.hello){const W=[`Bienvenue ${civ} ${c.nom}. Que Dieu vous donne le moyen de payer.`,`Bonne arrivée ${civ} ${c.nom}. Vous êtes à la bonne adresse.`,`Bonjour ${civ} ${c.nom}. Que Dieu bénisse votre journée.`];S.hello=W[Math.floor(Math.random()*W.length)]}
+const vox=`<div class="row"><button class="b o" onclick="parler(S.hello+' '+(S.msg||''))">🔊 Écouter</button><button class="b o" onclick="toggleVox()">${voixOn()?'Voix : activée':'Voix : coupée'}</button></div>`;
+app.innerHTML=`<header><div><small>Bonjour</small><h1>${esc(c.nom)}</h1></div><div style="text-align:right"><small>Reste à payer</small><h1>${fmt(O)}</h1></div></header>${ban}${ban2}${ad}<div class="pad">${vox}${pay}${cr}${window.DI?'<button class="b o" onclick="install()">Installer l\'application</button>':''}<button class="b o" onclick="login()">Quitter</button></div>${btn}`;if(!S.locDone){S.locDone=1;sendLoc()}if(!S.said){S.said=1;if(voixOn())parler(S.hello+' '+(S.msg||''));startVox()}}
+
+function payNow(k,m){copyNum(k,true);if(confirm('Envoyez '+fmt(m)+' par Wave ou Orange Money au '+S.R[k].v.payFmt+' (numéro copié).\n\nVous avez déjà payé ? Appuyez sur OK pour prévenir le vendeur sur WhatsApp.'))sendProof(k)}
+function copyNum(k,q){const n=S.R[k].v.pay;if(navigator.clipboard)navigator.clipboard.writeText(n).then(()=>{if(!q)alert('Numéro copié : '+n)},()=>{});else if(!q)prompt('Numéro',n)}
+function sendLoc(){if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(async p=>{try{const loc={lat:p.coords.latitude,lng:p.coords.longitude,prec:Math.round(p.coords.accuracy),date:new Date().toISOString()};await Promise.all(S.R.map(r=>store.setLoc(r,loc)))}catch(e){}},()=>{},{enableHighAccuracy:true,timeout:20000,maximumAge:60000})}
+function sendProof(k){const r=S.R[k];open('https://wa.me/'+nn(num(r.v.pay))+'?text='+encodeURIComponent(`Bonjour, c'est ${S.client.nom}. J'ai envoyé mon versement par Wave/Orange Money. Merci de le valider. PayLittle`))}
+
+function dlRecu(T,no){const L=T.split('\n'),c=document.createElement('canvas');c.width=640;c.height=70+L.length*44;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.fillStyle='#1D4ED8';g.fillRect(0,0,c.width,10);g.fillStyle='#0F172A';L.forEach((t,i)=>{g.font=(i==0?'bold 28px':'24px')+' sans-serif';g.fillText(t,24,60+i*44)});c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=no+'.png';document.body.appendChild(a);a.click();a.remove()})}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.DI=e;const b=document.querySelector('#inst');if(b)b.style.display=''});
+function install(){if(window.DI){window.DI.prompt();window.DI=null;const b=document.querySelector('#inst');if(b)b.style.display='none'}}
+function parler(m){try{if(!window.speechSynthesis||!m)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(m);u.lang='fr-FR';u.rate=.95;speechSynthesis.speak(u)}catch(e){}}
+
+const voixOn=()=>{try{return localStorage.getItem('plvox')!='0'}catch(e){return true}};
+function toggleVox(){try{localStorage.setItem('plvox',voixOn()?'0':'1')}catch(e){}if(!voixOn()){try{speechSynthesis.cancel()}catch(e){}}clientView()}
+function startVox(){clearInterval(S.tm);let i=0;S.tm=setInterval(()=>{try{if(!S.R||!voixOn())return;const rest=S.R.reduce((s,r)=>s+owed(r),0);if(rest<=0)return;const E=S.R.reduce((s,r)=>s+echu(r),0),civ=(S.R[0].info&&S.R[0].info.sexe=='Femme')?'Madame':'Monsieur',n=S.client.nom,
+ L=[`${civ} ${n}, n'attendez pas d'avoir toute la somme. Vous pouvez payer un peu, chaque petit versement compte.`,
+ `Que Dieu vous donne le moyen de payer, ${civ} ${n}. Un petit versement aujourd'hui allège votre reste à payer.`,
+ `${civ} ${n}, vous êtes à la bonne adresse. Payer un peu chaque jour, c'est avancer vers la fin de votre crédit.`,
+ `Il vous reste ${rest} francs à payer. Payez ce que vous pouvez, même une petite somme, et rapprochez-vous de la fin.`,
+ `Merci de votre confiance, ${civ} ${n}. Payer à temps, c'est garder la confiance pour vos prochains articles.`,
+ `${civ} ${n}, ne laissez pas le reste à payer s'alourdir. Un petit versement maintenant vaut mieux qu'un gros plus tard.`];
+ const late=E>0&&i%2==0;const m=late?`Bonjour ${civ} ${n}. Votre paiement de ${E} francs est en retard. Veuillez vous en acquitter, s'il vous plaît. Merci.`:L[Math.floor(i/(E>0?2:1))%L.length];i++;parler(m)}catch(e){}},15*60*1000)}
+
+const locked=()=>{try{return (+localStorage.getItem('pllock')||0)>Date.now()}catch(e){return false}};
+const okTry=()=>{try{localStorage.removeItem('plfail')}catch(e){}};
+const badTry=e=>{try{if(!/invalid|wrong-password|user-not-found/.test((e&&e.code)||''))return;const n=(+localStorage.getItem('plfail')||0)+1;localStorage.setItem('plfail',n);if(n>=5){localStorage.setItem('pllock',Date.now()+15*60000);localStorage.setItem('plfail',0)}}catch(x){}};
+
+login();
+</script></body></html>
